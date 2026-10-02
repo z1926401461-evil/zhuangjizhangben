@@ -121,7 +121,8 @@
   <div class="card">
     <button class="btn btn-gray" onclick="exportJSON()">导出备份 (JSON)</button>
     <button class="btn btn-gray" onclick="exportCSV()">导出表格 (CSV，Excel 可打开)</button>
-    <button class="btn btn-gray" onclick="importData()">导入恢复 (JSON)</button>
+    <label for="fileInput" class="btn btn-gray" style="display:block;text-align:center;cursor:pointer;">导入恢复 (JSON)</label>
+<input type="file" id="fileInput" accept=".json" style="display:none">
      </div>
 
 <script>
@@ -192,8 +193,11 @@
     amountEl.focus();
   }
 
-  function deleteRecord(id) {
-    records = records.filter(r => r.id !== id);
+    function deleteRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    if (!confirm('确定删除这笔记录？\n\n' + r.category + '  ¥' + r.amount + (r.note ? '\n备注：' + r.note : ''))) return;
+    records = records.filter(x => x.id !== id);
     save();
     renderAll();
   }
@@ -281,33 +285,27 @@
     URL.revokeObjectURL(a.href);
   }
 
-  function importData() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = e => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        try {
-          const arr = JSON.parse(ev.target.result);
-          if (!Array.isArray(arr)) throw 0;
-          if (confirm('导入 ' + arr.length + ' 条，合并到现有数据？')) {
-            const existing = new Set(records.map(r => r.id));
-            arr.forEach(r => {
-              if (!existing.has(r.id)) {
-                records.push(r);
-                if (!categories.includes(r.category)) categories.push(r.category);
-              }
-            });
-            save();
-            renderAll();
+ function importDataFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const arr = JSON.parse(ev.target.result);
+      if (!Array.isArray(arr)) throw 0;
+      if (confirm('导入 ' + arr.length + ' 条，合并到现有数据？')) {
+        const existing = new Set(records.map(r => r.id));
+        arr.forEach(r => {
+          if (!existing.has(r.id)) {
+            records.push(r);
+            if (!categories.includes(r.category)) categories.push(r.category);
           }
-        } catch (err) { alert('文件格式不对'); }
-      };
-      reader.readAsText(e.target.files[0]);
-    };
-    input.click();
-  }
+        });
+        save();
+        renderAll();
+      }
+    } catch (err) { alert('文件格式不对'); }
+  };
+  reader.readAsText(file);
+}
 
  
   // ===== 渲染 =====
@@ -524,6 +522,12 @@
     document.getElementById('amount').addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
     document.getElementById('note').addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
     document.getElementById('newCat').addEventListener('keydown', e => { if (e.key === 'Enter') addCategory(); });
+
+    document.getElementById('fileInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) importDataFromFile(file);
+      e.target.value = '';
+    });
 
     window.addEventListener('resize', () => {
       if (currentTab === 'stats') renderChart();
