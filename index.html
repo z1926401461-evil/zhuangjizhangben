@@ -68,6 +68,49 @@
   .item-del { flex: 0 0 auto; border: none; background: transparent; color: #c7c7cc; font-size: 20px; cursor: pointer; padding: 4px 6px; line-height: 1; }
   .item-del:active { color: #ff3b30; }
   .empty { text-align: center; color: #c7c7cc; font-size: 13px; padding: 16px 0; }
+  /* 编辑弹窗 */
+  .item { cursor: pointer; }
+  .item:active { background: #fafafa; }
+  .modal-mask {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: #fff;
+    width: 100%;
+    max-width: 380px;
+    border-radius: 18px;
+    padding: 20px;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop {
+    from { transform: scale(.94); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 16px; font-weight: 600; }
+  .modal .label { font-size: 13px; color: #8e8e93; margin: 12px 0 6px; }
+  .modal input, .modal select {
+    width: 100%; border: none; outline: none;
+    background: #f2f2f7; border-radius: 10px;
+    padding: 12px; font-size: 15px;
+    font-family: inherit; color: #1c1c1e;
+  }
+  .modal-actions {
+    display: flex; gap: 10px; margin-top: 20px;
+  }
+  .modal-actions button {
+    flex: 1; border: none; border-radius: 11px;
+    padding: 13px; font-size: 16px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .modal-actions .cancel { background: #f2f2f7; color: #1c1c1e; }
+  .modal-actions .ok { background: #ff6b35; color: #fff; }
 </style>
 </head>
 <body>
@@ -125,6 +168,29 @@
 <input type="file" id="fileInput" accept=".json" style="display:none">
      </div>
 
+  <!-- 编辑弹窗 -->
+  <div id="editModal" class="modal-mask">
+    <div class="modal">
+      <h3>编辑记录</h3>
+
+      <div class="label">时间</div>
+      <input type="datetime-local" id="editDatetime" step="60">
+
+      <div class="label">金额</div>
+      <input type="number" id="editAmount" inputmode="decimal" step="0.01">
+
+      <div class="label">分类</div>
+      <select id="editCategory"></select>
+
+      <div class="label">备注</div>
+      <input type="text" id="editNote" maxlength="20" placeholder="可选">
+
+      <div class="modal-actions">
+        <button class="cancel" id="editCancel">✕ 取消</button>
+        <button class="ok" id="editSave">✓ 保存</button>
+      </div>
+    </div>
+  </div>
 <script>
   const STORAGE_KEY = 'myLedger';
   const CAT_KEY = 'myLedgerCats';
@@ -177,12 +243,14 @@
     const amount = parseFloat(amountEl.value);
     if (!amount || amount <= 0) { amountEl.focus(); return; }
 
+        const now = new Date();
     records.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       amount: amount,
       category: currentCat,
       note: document.getElementById('note').value.trim(),
-      date: document.getElementById('date').value || todayStr()
+      date: document.getElementById('date').value || todayStr(),
+      time: pad(now.getHours()) + ':' + pad(now.getMinutes())
     });
 
     save();
@@ -361,14 +429,14 @@
         lastDate = r.date;
         html += `<div class="day-head">${r.date}</div>`;
       }
-      html += `
-        <div class="item">
+            html += `
+        <div class="item" onclick="openEdit('${r.id}')">
           <div class="item-main">
             <div class="item-cat">${escapeHtml(r.category)}</div>
-            ${r.note ? `<div class="item-note">${escapeHtml(r.note)}</div>` : ''}
+            ${(r.note || r.time) ? `<div class="item-note">${r.time ? r.time + ' ' : ''}${escapeHtml(r.note || '')}</div>` : ''}
           </div>
           <div class="item-amt">-${money(r.amount)}</div>
-          <button class="item-del" onclick="deleteRecord('${r.id}')">×</button>
+          <button class="item-del" onclick="event.stopPropagation();deleteRecord('${r.id}')">×</button>
         </div>
       `;
     });
@@ -513,6 +581,66 @@
     return nice * mag;
   }
 
+  // ===== 编辑 =====
+  let editingId = null;
+
+  function openEdit(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    editingId = id;
+
+    // datetime-local 需要 yyyy-mm-ddThh:mm
+    const dt = r.date + 'T' + (r.time || '00:00');
+    document.getElementById('editDatetime').value = dt;
+    document.getElementById('editAmount').value = r.amount;
+    document.getElementById('editNote').value = r.note || '';
+
+    const sel = document.getElementById('editCategory');
+    sel.innerHTML = categories.map(c =>
+      `<option value="${c}" ${c === r.category ? 'selected' : ''}>${escapeHtml(c)}</option>`
+    ).join('');
+
+    document.getElementById('editModal').classList.add('show');
+    setTimeout(() => document.getElementById('editAmount').focus(), 100);
+  }
+
+  function closeEdit() {
+    editingId = null;
+    document.getElementById('editModal').classList.remove('show');
+  }
+
+  function saveEdit() {
+    const r = records.find(x => x.id === editingId);
+    if (!r) return;
+
+    const dt = document.getElementById('editDatetime').value;
+    if (!dt) { alert('请选择时间'); return; }
+    const [datePart, timePart] = dt.split('T');
+
+    const amount = parseFloat(document.getElementById('editAmount').value);
+    if (!amount || amount <= 0) { alert('请输入有效金额'); return; }
+
+    r.date = datePart;
+    r.time = timePart;
+    r.amount = amount;
+    r.category = document.getElementById('editCategory').value;
+    r.note = document.getElementById('editNote').value.trim();
+
+    save();
+    renderAll();
+    closeEdit();
+  }
+
+  // 绑定弹窗事件（放在 init 里也行，这里直接执行）
+  document.getElementById('editSave').addEventListener('click', saveEdit);
+  document.getElementById('editCancel').addEventListener('click', closeEdit);
+  document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target.id === 'editModal') closeEdit();
+  });
+  // 按 Esc 关闭
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && editingId) closeEdit();
+  });
   // ===== 启动 =====
   function init() {
     currentMonth = thisMonth();
