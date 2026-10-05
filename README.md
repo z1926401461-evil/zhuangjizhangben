@@ -1,0 +1,1 @@
+此版本数据存于cloudflare数据相较于存在本地服务器的localstorage不容易丢失
