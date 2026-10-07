@@ -1,23 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#ff6b35">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>记账本</title>
-  
-  <!-- 引入 localForage，用于大容量存储 -->
-  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-
+  <title>云端记账本</title>
   <style>
-    /* 1. 基础重置与全局样式 */
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body {
-      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: #f2f2f7; color: #1c1c1e;
-      max-width: 480px; margin: 0 auto; padding: 16px 16px 40px;
-    }
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f2f2f7; color: #1c1c1e; max-width: 480px; margin: 0 auto; padding: 16px 16px 40px; }
     .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
     .label { font-size: 13px; color: #8e8e93; margin-bottom: 6px; }
     .total { font-size: 34px; font-weight: 700; letter-spacing: -.5px; }
@@ -25,44 +14,32 @@
     .sub { font-size: 13px; color: #8e8e93; margin-top: 8px; }
     .sec-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
     .empty { text-align: center; color: #c7c7cc; font-size: 13px; padding: 16px 0; }
-
-    /* 2. 月份切换与汇总 */
     .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .month-nav button { border: none; background: #f2f2f7; width: 32px; height: 32px; border-radius: 8px; font-size: 18px; cursor: pointer; color: #1c1c1e; }
     .month-nav button:active { background: #e5e5ea; }
     #monthLabel { font-size: 15px; font-weight: 600; }
-
-    /* 3. 支出/收入切换按钮 */
     .type-switch { display: flex; gap: 6px; margin-bottom: 10px; background: #f2f2f7; padding: 4px; border-radius: 10px; }
     .type-btn { flex: 1; text-align: center; padding: 8px; font-size: 14px; font-weight: 600; border: none; background: transparent; border-radius: 7px; cursor: pointer; color: #8e8e93; transition: all .2s; }
     .type-btn.active[data-type="expense"] { background: #fff; color: #ff3b30; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
     .type-btn.active[data-type="income"] { background: #fff; color: #34c759; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-
-    /* 4. 输入区 */
     .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
     .input-row input { flex: 1; min-width: 0; border: none; outline: none; background: #f2f2f7; border-radius: 10px; padding: 12px; font-size: 15px; font-family: inherit; color: #1c1c1e; }
     .input-row input#amount { flex: 0 0 100px; }
     .input-row input[type=date] { flex: 0 0 130px; }
-
-    /* 5. 分类标签 */
     .cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
     .cat { padding: 7px 12px; border-radius: 9px; background: #f2f2f7; font-size: 13px; cursor: pointer; border: 1.5px solid transparent; user-select: none; }
     .cat.active { background: #fff2ec; border-color: #ff6b35; color: #ff6b35; font-weight: 600; }
     .cat .x { margin-left: 6px; color: #c7c7cc; font-size: 14px; }
     .cat .x:hover { color: #ff3b30; }
-
-    /* 6. 按钮 */
+    .cats-toggle { display: block; width: 100%; margin: -4px 0 10px; padding: 6px; border: none; background: transparent; color: #8e8e93; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .cats-toggle:active { color: #ff6b35; }
     .btn { width: 100%; border: none; border-radius: 11px; padding: 13px; background: #ff6b35; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn:active { opacity: .85; }
     .btn-gray { background: #3a3a3c; }
     .btn + .btn { margin-top: 8px; }
-
-    /* 7. 明细与统计 */
     .tabs { display: flex; gap: 6px; margin-bottom: 14px; background: #f2f2f7; padding: 4px; border-radius: 10px; }
     .tab { flex: 1; text-align: center; padding: 8px; font-size: 14px; cursor: pointer; border-radius: 7px; color: #8e8e93; }
     .tab.active { background: #fff; color: #1c1c1e; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-
-    /* 8. 统计条与图表 */
     .stat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
     .stat-name { width: 60px; flex: 0 0 auto; }
     .stat-bar { flex: 1; height: 7px; background: #f2f2f7; border-radius: 4px; overflow: hidden; }
@@ -72,8 +49,6 @@
     .mode { padding: 6px 14px; border-radius: 8px; background: #f2f2f7; font-size: 13px; cursor: pointer; color: #8e8e93; }
     .mode.active { background: #fff2ec; color: #ff6b35; font-weight: 600; }
     .chart-box { width: 100%; overflow: hidden; }
-
-    /* 9. 明细列表项 */
     .day-head { font-size: 12px; color: #8e8e93; margin: 8px 0 4px 2px; }
     .item { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f2f2f7; cursor: pointer; }
     .item:last-child { border-bottom: none; }
@@ -86,8 +61,6 @@
     .item-amt.income { color: #34c759; }
     .item-del { flex: 0 0 auto; border: none; background: transparent; color: #c7c7cc; font-size: 20px; cursor: pointer; padding: 4px 6px; line-height: 1; }
     .item-del:active { color: #ff3b30; }
-
-    /* 10. 通用弹窗样式 */
     .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
     .modal-mask.show { display: flex; }
     .modal { background: #fff; width: 100%; max-width: 380px; border-radius: 18px; padding: 20px; animation: pop .18s ease-out; }
@@ -99,93 +72,137 @@
     .modal-actions button { flex: 1; border: none; border-radius: 11px; padding: 13px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .modal-actions .cancel { background: #f2f2f7; color: #1c1c1e; }
     .modal-actions .ok { background: #ff6b35; color: #fff; }
+    /* ===== 登录/注册页面专属优化 ===== */
+#authView {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px; /* 留出手机屏幕边缘间距 */
+  box-sizing: border-box;
+}
 
-    /* 11. 添加到桌面弹窗样式 */
-    .install-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1100; align-items: center; justify-content: center; padding: 20px; }
-    .install-mask.show { display: flex; }
-    .install-box { background: #fff; width: 100%; max-width: 340px; border-radius: 18px; padding: 22px 20px 16px; text-align: center; animation: pop .18s ease-out; }
-    .install-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
-    .install-box p { font-size: 13px; color: #8e8e93; line-height: 1.6; margin-bottom: 14px; }
-    .install-box .tip { background: #f2f2f7; border-radius: 10px; padding: 12px; font-size: 13px; color: #3a3a3c; text-align: left; line-height: 1.7; margin-bottom: 14px; }
-    .install-box .tip b { color: #ff6b35; }
-    .install-actions { display: flex; gap: 10px; }
-    .install-actions button { flex: 1; border: none; border-radius: 11px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
-    .install-actions .later { background: #f2f2f7; color: #1c1c1e; }
-    .install-actions .go { background: #ff6b35; color: #fff; }
-    .install-never { display: block; margin-top: 12px; font-size: 12px; color: #c7c7cc; background: none; border: none; cursor: pointer; }
+.auth-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  /* 删掉了 min-height: 80vh，避免手机上键盘弹起时排版错位 */
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 24px 20px; /* 稍微加大内边距，看着更舒服 */
+}
+
+.auth-card h2 {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #ff6b35;
+  font-size: 22px;
+}
+
+/* 让输入框和按钮在手机上更宽松、更好点 */
+.auth-card input {
+  margin-bottom: 16px; /* 输入框之间加大间距 */
+  padding: 14px 16px; /* 加厚一点，方便手指点击 */
+}
+    .auth-card input { width: 100%; border: none; outline: none; background: #f2f2f7; border-radius: 10px; padding: 12px; font-size: 15px; font-family: inherit; color: #1c1c1e; margin-bottom: 12px; }
+    .auth-card .btn { margin-top: 6px; }
+    .auth-switch { text-align: center; margin-top: 14px; font-size: 13px; color: #8e8e93; }
+    .auth-switch a { color: #ff6b35; cursor: pointer; font-weight: 600; margin-left: 4px; }
   </style>
 </head>
 <body>
 
-  <!-- 汇总 -->
-  <div class="card">
-    <div class="month-nav">
-      <button onclick="changeMonth(-1)">‹</button>
-      <span id="monthLabel"></span>
-      <button onclick="changeMonth(1)">›</button>
-    </div>
-    <div class="label">本月支出</div>
-    <div class="total"><small>¥</small><span id="monthExpense">0.00</span></div>
-    <div class="sub" id="summarySub">本月收入 ¥0.00 · 结余 ¥0.00</div>
-    <div class="sub" id="allTotal">累计 ¥0.00 · 共 0 笔</div>
-  </div>
-
-  <!-- 输入 -->
-  <div class="card">
-    <div class="type-switch">
-      <button class="type-btn active" data-type="expense" onclick="selectType('expense')">支出</button>
-      <button class="type-btn" data-type="income" onclick="selectType('income')">收入</button>
-    </div>
-    <div class="input-row">
-      <input id="amount" type="number" inputmode="decimal" placeholder="金额">
-      <input id="note" type="text" placeholder="备注（可选）" maxlength="20">
-    </div>
-    <div class="cats" id="cats"></div>
-    <div class="input-row">
-      <input id="date" type="date">
-      <button class="btn" id="addBtn">记一笔</button>
-    </div>
-  </div>
-
-  <!-- 明细 / 统计 -->
-  <div class="card">
-    <div class="tabs">
-      <div class="tab active" data-tab="list" onclick="switchTab('list')">明细</div>
-      <div class="tab" data-tab="stats" onclick="switchTab('stats')">统计</div>
-    </div>
-    <div id="tabList"></div>
-    <div id="tabStats" style="display:none;"></div>
-  </div>
-
-  <!-- 分类管理 -->
-  <div class="card">
-    <div class="sec-title">分类管理</div>
-    <div class="cats" id="catManager"></div>
-    <div class="input-row" style="margin-top:8px;">
-      <input id="newCat" placeholder="新分类名称，如：娱乐、健身" maxlength="8">
-      <button class="btn" onclick="addCategory()" style="flex:0 0 80px;">添加</button>
-    </div>
-  </div>
-
-  <!-- 备份 -->
-  <div class="card">
-    <button class="btn btn-gray" onclick="exportJSON()">导出备份 (JSON)</button>
-    <button class="btn btn-gray" onclick="exportCSV()">导出表格 (CSV，Excel 可打开)</button>
-    <label for="fileInput" class="btn btn-gray" style="display:block;text-align:center;cursor:pointer;">导入恢复 (JSON)</label>
-    <input type="file" id="fileInput" accept=".json" style="display:none">
-  </div>
-
-  <!-- 添加到桌面弹窗 -->
-  <div id="installMask" class="install-mask">
-    <div class="install-box">
-      <h3 id="installTitle">添加到桌面</h3>
-      <p id="installDesc">把记账本装到桌面，打开更快，还能离线用。</p>
-      <div id="installTip" class="tip" style="display:none;"></div>
-      <div class="install-actions">
-        <button class="later" id="installLater">以后再说</button>
-        <button class="go" id="installGo">立即添加</button>
+  <!-- 登录 / 注册视图 -->
+  <div id="authView" style="display:none;">
+    <div id="loginPanel" class="auth-container">
+      <div class="card auth-card">
+        <h2>云端记账本</h2>
+        <div class="label">用户名</div>
+        <input type="text" id="loginUsername" placeholder="输入用户名" maxlength="20">
+        <div class="label">密码</div>
+        <input type="password" id="loginPassword" placeholder="输入密码" maxlength="20">
+        <button class="btn" onclick="handleLogin()">登录</button>
+        <div class="auth-switch">还没有账号？<a onclick="showRegister()">立即注册</a></div>
       </div>
-      <button class="install-never" id="installNever">不再提示</button>
+    </div>
+    <div id="registerPanel" class="auth-container" style="display:none;">
+      <div class="card auth-card">
+        <h2>注册新账号</h2>
+        <div class="label">用户名</div>
+        <input type="text" id="regUsername" placeholder="设置用户名，汉字 字母 数字皆可" maxlength="20">
+        <div class="label">密码</div>
+        <input type="password" id="regPassword" placeholder="设置密码" maxlength="20">
+        <div class="label">确认密码</div>
+        <input type="password" id="regPassword2" placeholder="再次输入密码" maxlength="20">
+        <button class="btn" onclick="handleRegister()">注册</button>
+        <div class="auth-switch">已有账号？<a onclick="showLogin()">返回登录</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="mainView" style="display:block;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <div style="font-size: 15px; font-weight: 600;">👋 你好, <span id="displayUsername">用户</span></div>
+      <button class="btn" style="width: auto; padding: 6px 12px; font-size: 13px; background: #e5e5ea; color: #1c1c1e;" onclick="handleLogout()">退出登录</button>
+    </div>
+
+    <div class="card">
+      <div class="month-nav">
+        <button onclick="changeMonth(-1)">‹</button>
+        <span id="monthLabel"></span>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="label">本月支出</div>
+      <div class="total"><small>¥</small><span id="monthExpense">0.00</span></div>
+      <div class="sub" id="summarySub">本月收入 ¥0.00 · 结余 ¥0.00</div>
+      <div class="sub" id="allTotal">累计 ¥0.00 · 共 0 笔</div>
+    </div>
+
+    <div class="card">
+      <div class="type-switch">
+        <button class="type-btn active" data-type="expense" onclick="selectType('expense')">支出</button>
+        <button class="type-btn" data-type="income" onclick="selectType('income')">收入</button>
+      </div>
+      <div class="input-row">
+        <input id="amount" type="number" inputmode="decimal" placeholder="金额">
+        <input id="note" type="text" placeholder="备注（可选）" maxlength="20">
+      </div>
+      <div class="cats" id="cats"></div>
+      <button class="cats-toggle" id="catsToggleBtn" style="display:none;" onclick="toggleCats()">展开全部 ▾</button>
+      <div class="input-row">
+        <input id="date" type="date">
+        <button class="btn" id="addBtn">记一笔</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="list" onclick="switchTab('list')">明细</div>
+        <div class="tab" data-tab="stats" onclick="switchTab('stats')">统计</div>
+      </div>
+      <div id="tabList"></div>
+      <div id="tabStats" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">分类管理</div>
+      <div class="cats" id="catManager"></div>
+      <button class="cats-toggle" id="catMgrToggleBtn" style="display:none;" onclick="toggleCatMgr()">展开全部 ▾</button>
+      <div class="input-row" style="margin-top:8px;">
+        <input id="newCat" placeholder="新分类名称" maxlength="8">
+        <button class="btn" onclick="addCategory()" style="flex:0 0 80px;">添加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="btn btn-gray" onclick="exportJSON()">导出备份 (JSON)</button>
+      <button class="btn btn-gray" onclick="exportCSV()">导出表格 (CSV)</button>
+      <label for="fileInput" class="btn btn-gray" style="display:block;text-align:center;cursor:pointer;">导入恢复 (JSON)</label>
+      <input type="file" id="fileInput" accept=".json" style="display:none">
     </div>
   </div>
 
@@ -214,12 +231,9 @@
   </div>
 
 <script>
-  // ==========================================
-  // 1. 常量与全局变量
-  // ==========================================
-  const STORAGE_KEY = 'myLedger';
-  const CAT_KEY = 'myLedgerCats';
-  const DEFAULT_CATS = ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '工资', '其他'];
+  const API_BASE = 'https://2.myjzb.de5.net';
+  const API_URL = API_BASE + '/api/records';
+  const AUTH_URL = API_BASE + '/api';
 
   let records = [];
   let categories = [];
@@ -228,120 +242,133 @@
   let currentTab = 'list';
   let chartMode = 'day';
   let currentType = 'expense';
+  let catsExpanded = false;
+  let catMgrExpanded = false;
+  let authToken = localStorage.getItem('authToken') || '';
+  let currentUsername = localStorage.getItem('username') || '';
 
-  // ==========================================
-  // 2. 工具函数
-  // ==========================================
   function pad(n) { return String(n).padStart(2, '0'); }
-  function todayStr() {
-    const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  }
-  function thisMonth() {
-    const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1);
-  }
+  function todayStr() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function thisMonth() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
   function money(n) { return n.toFixed(2); }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function escapeAttr(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+  async function fetchWithAuth(url, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (authToken) options.headers['Authorization'] = 'Bearer ' + authToken;
+    return fetch(url, options);
   }
 
-  // ==========================================
-  // 3. 数据读写（升级为 localForage/IndexedDB）
-  // ==========================================
+  // ========== 认证视图 ==========
+  function showLogin() {
+    document.getElementById('loginPanel').style.display = 'flex';
+    document.getElementById('registerPanel').style.display = 'none';
+  }
+  function showRegister() {
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('registerPanel').style.display = 'flex';
+  }
+
+  function checkAuth() {
+    if (authToken && currentUsername) {
+      document.getElementById('authView').style.display = 'none';
+      document.getElementById('mainView').style.display = 'block';
+      document.getElementById('displayUsername').textContent = currentUsername;
+      initMainData();
+    } else {
+      document.getElementById('authView').style.display = 'flex';
+      document.getElementById('mainView').style.display = 'none';
+      showLogin();
+    }
+  }
+
+  async function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!username || !password) { alert('请输入用户名和密码'); return; }
+    try {
+      const res = await fetch(`${AUTH_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        authToken = data.token; currentUsername = username;
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('username', currentUsername);
+        checkAuth();
+      } else { alert(data.error || '登录失败'); }
+    } catch (e) { alert('网络错误，无法登录'); }
+  }
+
+  async function handleRegister() {
+    const username = document.getElementById('regUsername').value.trim();
+    const password = document.getElementById('regPassword').value.trim();
+    const password2 = document.getElementById('regPassword2').value.trim();
+    if (!username || !password) { alert('请输入用户名和密码'); return; }
+    if (password !== password2) { alert('两次密码不一致'); return; }
+    try {
+      const res = await fetch(`${AUTH_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        authToken = data.token; currentUsername = username;
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('username', currentUsername);
+        checkAuth();
+      } else { alert(data.error || '注册失败'); }
+    } catch (e) { alert('网络错误，无法注册'); }
+  }
+
+  function handleLogout() {
+    if (!confirm('确定要退出登录吗？')) return;
+    authToken = ''; currentUsername = '';
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('username');
+    checkAuth();
+  }
+
+  // ========== 数据加载 ==========
+  async function loadCategories() {
+    try {
+      const res = await fetchWithAuth(AUTH_URL + '/categories');
+      if (!res.ok) return;
+      categories = await res.json();
+    } catch (e) { console.error('加载分类失败', e); }
+  }
+
   async function load() {
+    if (!authToken) return;
     try {
-      // 尝试从 IndexedDB 读取
-      let rawRecords = await localforage.getItem(STORAGE_KEY);
-      let rawCats = await localforage.getItem(CAT_KEY);
-
-      // 数据迁移：如果 IndexedDB 里没有，但 localStorage 里有旧数据，自动迁移过来
-      if (!rawRecords) {
-        const oldRecords = localStorage.getItem(STORAGE_KEY);
-        if (oldRecords) {
-          rawRecords = JSON.parse(oldRecords);
-          await localforage.setItem(STORAGE_KEY, rawRecords);
-          localStorage.removeItem(STORAGE_KEY);
-        }
+      const response = await fetchWithAuth(API_URL);
+      if (response.status === 401) { alert('登录已过期，请重新登录'); handleLogout(); return; }
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error('HTTP ' + response.status + ' - ' + errText);
       }
-      if (!rawCats) {
-        const oldCats = localStorage.getItem(CAT_KEY);
-        if (oldCats) {
-          rawCats = JSON.parse(oldCats);
-          await localforage.setItem(CAT_KEY, rawCats);
-          localStorage.removeItem(CAT_KEY);
-        }
-      }
-
-      if (rawRecords) records = rawRecords;
-      if (rawCats) categories = rawCats;
+      const data = await response.json();
+      records = data.map(r => ({ ...r, id: String(r.id), amount: parseFloat(r.amount) }));
     } catch (e) {
-      console.error('读取数据失败', e);
+      console.error('读取云端数据失败', e);
+      alert('无法连接云端数据库: ' + e.message);
     }
-
-    if (!Array.isArray(categories) || !categories.length) categories = DEFAULT_CATS.slice();
-    if (!currentCat || !categories.includes(currentCat)) currentCat = categories[0];
-  }
-
-  async function save() {
-    try {
-      await localforage.setItem(STORAGE_KEY, records);
-      await localforage.setItem(CAT_KEY, categories);
-    } catch (e) {
-      console.error('保存数据失败', e);
+    await loadCategories();
+    if (!currentCat || !categories.some(c => c.name === currentCat)) {
+      currentCat = categories.length ? categories[0].name : '';
     }
   }
 
-  // ==========================================
-  // 4. 输入与类型切换
-  // ==========================================
+  // ========== 分类选择 ==========
   function selectType(type) {
     currentType = type;
-    document.querySelectorAll('.type-btn[data-type]').forEach(el => {
-      el.classList.toggle('active', el.dataset.type === type);
-    });
-    if (type === 'income' && categories.includes('工资')) {
-      selectCat('工资');
-    } else if (type === 'expense') {
-      selectCat(categories[0]);
-    }
-  }
-
-  // ==========================================
-  // 5. 增删记录
-  // ==========================================
-  async function addRecord() {
-    const amountEl = document.getElementById('amount');
-    const amount = parseFloat(amountEl.value);
-    if (!amount || amount <= 0) { amountEl.focus(); return; }
-
-    const now = new Date();
-    records.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      type: currentType,
-      amount: amount,
-      category: currentCat,
-      note: document.getElementById('note').value.trim(),
-      date: document.getElementById('date').value || todayStr(),
-      time: pad(now.getHours()) + ':' + pad(now.getMinutes())
-    });
-
-    await save();
-    renderAll();
-
-    amountEl.value = '';
-    document.getElementById('note').value = '';
-    amountEl.focus();
-  }
-
-  async function deleteRecord(id) {
-    const r = records.find(x => x.id === id);
-    if (!r) return;
-    const typeName = (r.type === 'income') ? '收入' : '支出';
-    if (!confirm(`确定删除这笔${typeName}记录？\n\n${r.category}  ¥${r.amount}${r.note ? '\n备注：' + r.note : ''}`)) return;
-    records = records.filter(x => x.id !== id);
-    await save();
-    renderAll();
+    document.querySelectorAll('.type-btn[data-type]').forEach(el => { el.classList.toggle('active', el.dataset.type === type); });
+    if (type === 'income' && categories.some(c => c.name === '工资')) { selectCat('工资'); }
+    else if (type === 'expense' && categories.length) { selectCat(categories[0].name); }
   }
 
   function selectCat(cat) {
@@ -349,154 +376,172 @@
     document.querySelectorAll('#cats .cat').forEach(el => {
       el.classList.toggle('active', el.dataset.cat === cat);
     });
+    const activeEl = document.querySelector('#cats .cat.active');
+    if (activeEl && activeEl.style.display === 'none') {
+      catsExpanded = true;
+      applyCollapse('cats', 'catsToggleBtn', catsExpanded);
+    }
   }
 
-  function changeMonth(delta) {
-    const parts = currentMonth.split('-').map(Number);
-    const d = new Date(parts[0], parts[1] - 1 + delta, 1);
-    currentMonth = d.getFullYear() + '-' + pad(d.getMonth() + 1);
-    renderAll();
-  }
+  // ========== 折叠逻辑 ==========
+  function applyCollapse(containerId, btnId, expanded) {
+    const container = document.getElementById(containerId);
+    const btn = document.getElementById(btnId);
+    if (!container || !btn) return;
 
-  function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.tab').forEach(el => {
-      el.classList.toggle('active', el.dataset.tab === tab);
+    const items = Array.from(container.children);
+    items.forEach(el => el.style.display = '');
+    btn.style.display = 'none';
+    if (items.length === 0) return;
+
+    const tops = [];
+    items.forEach(el => {
+      const t = el.offsetTop;
+      if (!tops.some(x => Math.abs(x - t) < 3)) tops.push(t);
     });
-    document.getElementById('tabList').style.display = tab === 'list' ? 'block' : 'none';
-    document.getElementById('tabStats').style.display = tab === 'stats' ? 'block' : 'none';
-    renderAll();
+
+    if (tops.length <= 3) return;
+
+    if (!expanded) {
+      const line4 = tops[3];
+      items.forEach(el => {
+        if (el.offsetTop >= line4 - 1 && !el.classList.contains('active')) {
+          el.style.display = 'none';
+        }
+      });
+    }
+
+    btn.style.display = 'block';
+    btn.textContent = expanded ? '收起 ▴' : '展开全部 ▾';
   }
 
-  function switchChartMode(mode) {
-    chartMode = mode;
-    document.querySelectorAll('.mode').forEach(el => {
-      el.classList.toggle('active', el.dataset.mode === mode);
-    });
-    renderChart();
+  function toggleCats() {
+    catsExpanded = !catsExpanded;
+    applyCollapse('cats', 'catsToggleBtn', catsExpanded);
+  }
+  function toggleCatMgr() {
+    catMgrExpanded = !catMgrExpanded;
+    applyCollapse('catManager', 'catMgrToggleBtn', catMgrExpanded);
   }
 
-  // ==========================================
-  // 6. 分类管理
-  // ==========================================
+  // ========== 分类的增删 ==========
   async function addCategory() {
     const input = document.getElementById('newCat');
     const name = input.value.trim();
     if (!name) return;
-    if (categories.includes(name)) { alert('这个分类已经存在'); return; }
-    categories.push(name);
-    input.value = '';
-    await save();
-    renderAll();
+    if (categories.some(c => c.name === name)) { alert('这个分类已经存在'); return; }
+    try {
+      const res = await fetchWithAuth(AUTH_URL + '/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || '添加失败');
+        return;
+      }
+      input.value = '';
+      await loadCategories();
+      renderAll();
+    } catch (e) { alert('添加失败'); }
   }
 
-  async function removeCategory(name) {
+  async function removeCategory(id) {
     if (categories.length <= 1) { alert('至少保留一个分类'); return; }
-    const count = records.filter(r => r.category === name).length;
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+    const count = records.filter(r => r.category === cat.name).length;
     if (count > 0) {
-      if (!confirm(`「${name}」下还有 ${count} 条记录，删除后这些记录会变成「其他」。确定吗？`)) return;
-      records.forEach(r => { if (r.category === name) r.category = '其他'; });
+      if (!confirm(`「${cat.name}」下还有 ${count} 条记录，删除后这些记录会变成「其他」。确定吗？`)) return;
     }
-    categories = categories.filter(c => c !== name);
-    if (currentCat === name) currentCat = categories[0];
-    await save();
-    renderAll();
+    try {
+      const res = await fetchWithAuth(`${AUTH_URL}/categories/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || '删除失败');
+        return;
+      }
+      await load();
+      renderAll();
+    } catch (e) { alert('删除失败'); }
   }
 
-  // ==========================================
-  // 7. 导入与导出
-  // ==========================================
-  function exportJSON() {
-    const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'ledger-' + todayStr() + '.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
+  // ========== 记录增删 ==========
+  async function addRecord() {
+    const amountEl = document.getElementById('amount');
+    const amount = parseFloat(amountEl.value);
+    if (!amount || amount <= 0) { amountEl.focus(); return; }
+    if (!currentCat) { alert('请先添加分类'); return; }
 
-  function exportCSV() {
-    let csv = '日期,类型,分类,金额,备注\n';
-    const sorted = records.slice().sort((a, b) => a.date.localeCompare(b.date));
-    sorted.forEach(r => {
-      const typeName = (r.type === 'income') ? '收入' : '支出';
-      const note = (r.note || '').replace(/"/g, '""');
-      csv += `${r.date},${typeName},${r.category},${r.amount},"${note}"\n`;
-    });
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'ledger-' + todayStr() + '.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  async function importDataFromFile(file) {
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      try {
-        const arr = JSON.parse(ev.target.result);
-        if (!Array.isArray(arr)) throw 0;
-        if (confirm('导入 ' + arr.length + ' 条，合并到现有数据？')) {
-          const existing = new Set(records.map(r => r.id));
-          arr.forEach(r => {
-            if (!existing.has(r.id)) {
-              if (!r.type) r.type = 'expense';
-              records.push(r);
-              if (!categories.includes(r.category)) categories.push(r.category);
-            }
-          });
-          await save();
-          renderAll();
-        }
-      } catch (err) { alert('文件格式不对'); }
+    const now = new Date();
+    const newRecord = {
+      type: currentType, amount: amount, category: currentCat,
+      note: document.getElementById('note').value.trim(),
+      date: document.getElementById('date').value || todayStr(),
+      time: pad(now.getHours()) + ':' + pad(now.getMinutes())
     };
-    reader.readAsText(file);
+
+    try {
+      const res = await fetchWithAuth(API_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord)
+      });
+      if (res.status === 401) { handleLogout(); return; }
+      if (!res.ok) throw new Error('保存失败');
+      await load(); renderAll();
+      amountEl.value = ''; document.getElementById('note').value = ''; amountEl.focus();
+    } catch (err) { alert('保存到云端失败，请重试'); }
   }
 
-  // ==========================================
-  // 8. 渲染逻辑
-  // ==========================================
+  async function deleteRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    if (!confirm(`确定删除这笔记录？\n\n${r.category}  ¥${r.amount}`)) return;
+    try {
+      const res = await fetchWithAuth(`${API_URL}/${id}`, { method: 'DELETE' });
+      if (res.status === 401) { handleLogout(); return; }
+      await load(); renderAll();
+    } catch (e) { alert('删除失败，请重试'); }
+  }
+
+  // ========== 视图渲染 ==========
+  function changeMonth(delta) { const parts = currentMonth.split('-').map(Number); const d = new Date(parts[0], parts[1] - 1 + delta, 1); currentMonth = d.getFullYear() + '-' + pad(d.getMonth() + 1); renderAll(); }
+  function switchTab(tab) { currentTab = tab; document.querySelectorAll('.tab').forEach(el => { el.classList.toggle('active', el.dataset.tab === tab); }); document.getElementById('tabList').style.display = tab === 'list' ? 'block' : 'none'; document.getElementById('tabStats').style.display = tab === 'stats' ? 'block' : 'none'; renderAll(); }
+  function switchChartMode(mode) { chartMode = mode; document.querySelectorAll('.mode').forEach(el => { el.classList.toggle('active', el.dataset.mode === mode); }); renderChart(); }
+
   function renderAll() {
     renderCatPicker();
     renderCatManager();
     renderSummary();
-    if (currentTab === 'list') renderList();
-    else renderStats();
+    if (currentTab === 'list') renderList(); else renderStats();
   }
 
   function renderCatPicker() {
     document.getElementById('cats').innerHTML = categories.map(c =>
-      `<div class="cat ${c === currentCat ? 'active' : ''}" data-cat="${c}" onclick="selectCat('${c}')">${c}</div>`
+      `<div class="cat ${c.name === currentCat ? 'active' : ''}" data-cat="${escapeHtml(c.name)}" onclick="selectCat('${escapeAttr(c.name)}')">${escapeHtml(c.name)}</div>`
     ).join('');
+    applyCollapse('cats', 'catsToggleBtn', catsExpanded);
   }
 
   function renderCatManager() {
     document.getElementById('catManager').innerHTML = categories.map(c =>
-      `<div class="cat">${c}<span class="x" onclick="removeCategory('${c}')">×</span></div>`
+      `<div class="cat">${escapeHtml(c.name)}<span class="x" onclick="removeCategory(${c.id})">×</span></div>`
     ).join('');
+    applyCollapse('catManager', 'catMgrToggleBtn', catMgrExpanded);
   }
 
   function renderSummary() {
     const monthRecords = records.filter(r => r.date.startsWith(currentMonth));
     let monthExpense = 0, monthIncome = 0;
-    monthRecords.forEach(r => {
-      if (r.type === 'income') monthIncome += r.amount;
-      else monthExpense += r.amount;
-    });
+    monthRecords.forEach(r => { if (r.type === 'income') monthIncome += r.amount; else monthExpense += r.amount; });
     const monthBalance = monthIncome - monthExpense;
-
     let allExpense = 0, allIncome = 0;
-    records.forEach(r => {
-      if (r.type === 'income') allIncome += r.amount;
-      else allExpense += r.amount;
-    });
+    records.forEach(r => { if (r.type === 'income') allIncome += r.amount; else allExpense += r.amount; });
     const allBalance = allIncome - allExpense;
-
     document.getElementById('monthExpense').textContent = money(monthExpense);
     document.getElementById('summarySub').textContent = `本月收入 ¥${money(monthIncome)} · 结余 ¥${money(monthBalance)}`;
     document.getElementById('allTotal').textContent = `累计支出 ¥${money(allExpense)} · 累计结余 ¥${money(allBalance)} · 共 ${records.length} 笔`;
-
     const parts = currentMonth.split('-');
     document.getElementById('monthLabel').textContent = parts[0] + '年' + Number(parts[1]) + '月';
   }
@@ -504,36 +549,13 @@
   function renderList() {
     const box = document.getElementById('tabList');
     const monthRecords = records.filter(r => r.date.startsWith(currentMonth));
-    if (!monthRecords.length) {
-      box.innerHTML = '<div class="empty">本月还没有记录</div>';
-      return;
-    }
-
-    const sorted = monthRecords.slice().sort((a, b) =>
-      b.date.localeCompare(a.date) || b.id.localeCompare(a.id)
-    );
-
-    let html = '';
-    let lastDate = '';
+    if (!monthRecords.length) { box.innerHTML = '<div class="empty">本月还没有记录</div>'; return; }
+    const sorted = monthRecords.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    let html = ''; let lastDate = '';
     sorted.forEach(r => {
-      if (r.date !== lastDate) {
-        lastDate = r.date;
-        html += `<div class="day-head">${r.date}</div>`;
-      }
-      const isIncome = r.type === 'income';
-      const amtClass = isIncome ? 'income' : 'expense';
-      const sign = isIncome ? '+' : '-';
-
-      html += `
-        <div class="item" onclick="openEdit('${r.id}')">
-          <div class="item-main">
-            <div class="item-cat">${escapeHtml(r.category)}</div>
-            ${(r.note || r.time) ? `<div class="item-note">${r.time ? r.time + ' ' : ''}${escapeHtml(r.note || '')}</div>` : ''}
-          </div>
-          <div class="item-amt ${amtClass}">${sign}${money(r.amount)}</div>
-          <button class="item-del" onclick="event.stopPropagation();deleteRecord('${r.id}')">×</button>
-        </div>
-      `;
+      if (r.date !== lastDate) { lastDate = r.date; html += `<div class="day-head">${r.date}</div>`; }
+      const isIncome = r.type === 'income'; const amtClass = isIncome ? 'income' : 'expense'; const sign = isIncome ? '+' : '-';
+      html += `<div class="item" onclick="openEdit('${r.id}')"><div class="item-main"><div class="item-cat">${escapeHtml(r.category)}</div>${(r.note || r.time) ? `<div class="item-note">${r.time ? r.time + ' ' : ''}${escapeHtml(r.note || '')}</div>` : ''}</div><div class="item-amt ${amtClass}">${sign}${money(r.amount)}</div><button class="item-del" onclick="event.stopPropagation();deleteRecord('${r.id}')">×</button></div>`;
     });
     box.innerHTML = html;
   }
@@ -542,351 +564,194 @@
     const box = document.getElementById('tabStats');
     const monthRecords = records.filter(r => r.date.startsWith(currentMonth));
     let html = '<div class="sec-title">本月支出分类占比</div>';
-
     const expenseRecords = monthRecords.filter(r => r.type !== 'income');
     const incomeRecords = monthRecords.filter(r => r.type === 'income');
     const incomeTotal = incomeRecords.reduce((s, r) => s + r.amount, 0);
-
-    if (!expenseRecords.length) {
-      html += '<div class="empty">本月还没有支出记录</div>';
-    } else {
-      const byCat = {};
-      let total = 0;
-      expenseRecords.forEach(r => {
-        byCat[r.category] = (byCat[r.category] || 0) + r.amount;
-        total += r.amount;
-      });
-
-      const arr = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-      const max = arr[0][1];
-
-      html += arr.map(([cat, val]) => {
-        const pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-        return `
-          <div class="stat-row">
-            <div class="stat-name">${escapeHtml(cat)}</div>
-            <div class="stat-bar"><i style="width:${(val / max * 100).toFixed(1)}%"></i></div>
-            <div class="stat-val">${pct}% · ¥${money(val)}</div>
-          </div>
-        `;
-      }).join('');
+    if (!expenseRecords.length) { html += '<div class="empty">本月还没有支出记录</div>'; }
+    else {
+      const byCat = {}; let total = 0;
+      expenseRecords.forEach(r => { byCat[r.category] = (byCat[r.category] || 0) + r.amount; total += r.amount; });
+      const arr = Object.entries(byCat).sort((a, b) => b[1] - a[1]); const max = arr[0][1];
+      html += arr.map(([cat, val]) => { const pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0'; return `<div class="stat-row"><div class="stat-name">${escapeHtml(cat)}</div><div class="stat-bar"><i style="width:${(val / max * 100).toFixed(1)}%"></i></div><div class="stat-val">${pct}% · ¥${money(val)}</div></div>`; }).join('');
     }
-
-    if (incomeTotal > 0) {
-      html += `<div class="sub" style="text-align:center;margin-top:10px;">本月总收入 ¥${money(incomeTotal)}</div>`;
-    }
-
-    html += `
-      <div class="sec-title" style="margin-top:20px;">趋势（支出）</div>
-      <div class="chart-modes">
-        <div class="mode ${chartMode==='day'?'active':''}" data-mode="day" onclick="switchChartMode('day')">日度</div>
-        <div class="mode ${chartMode==='month'?'active':''}" data-mode="month" onclick="switchChartMode('month')">月度</div>
-        <div class="mode ${chartMode==='year'?'active':''}" data-mode="year" onclick="switchChartMode('year')">年度</div>
-      </div>
-      <div id="chartBox" class="chart-box"></div>
-    `;
-
-    box.innerHTML = html;
-    renderChart();
+    if (incomeTotal > 0) { html += `<div class="sub" style="text-align:center;margin-top:10px;">本月总收入 ¥${money(incomeTotal)}</div>`; }
+    html += `<div class="sec-title" style="margin-top:20px;">趋势（支出）</div><div class="chart-modes"><div class="mode ${chartMode==='day'?'active':''}" data-mode="day" onclick="switchChartMode('day')">日度</div><div class="mode ${chartMode==='month'?'active':''}" data-mode="month" onclick="switchChartMode('month')">月度</div><div class="mode ${chartMode==='year'?'active':''}" data-mode="year" onclick="switchChartMode('year')">年度</div></div><div id="chartBox" class="chart-box"></div>`;
+    box.innerHTML = html; renderChart();
   }
 
   function renderChart() {
-    const box = document.getElementById('chartBox');
-    if (!box) return;
-    let data = [], labels = [];
-    const expenseRecords = records.filter(r => r.type !== 'income');
-
+    const box = document.getElementById('chartBox'); if (!box) return;
+    let data = [], labels = []; const expenseRecords = records.filter(r => r.type !== 'income');
     if (chartMode === 'day') {
-      const [y, m] = currentMonth.split('-').map(Number);
-      const days = new Date(y, m, 0).getDate();
-      data = new Array(days).fill(0);
-      labels = [];
-      for (let d = 1; d <= days; d++) {
-        labels.push(d);
-        const dateStr = currentMonth + '-' + pad(d);
-        expenseRecords.forEach(r => {
-          if (r.date === dateStr) data[d - 1] += r.amount;
-        });
-      }
+      const [y, m] = currentMonth.split('-').map(Number); const days = new Date(y, m, 0).getDate();
+      data = new Array(days).fill(0); labels = [];
+      for (let d = 1; d <= days; d++) { labels.push(d); const dateStr = currentMonth + '-' + pad(d); expenseRecords.forEach(r => { if (r.date === dateStr) data[d - 1] += r.amount; }); }
     } else if (chartMode === 'month') {
-      const year = currentMonth.split('-')[0];
-      data = new Array(12).fill(0);
-      labels = ['1','2','3','4','5','6','7','8','9','10','11','12'];
-      expenseRecords.forEach(r => {
-        const [ry, rm] = r.date.split('-');
-        if (ry === year) data[Number(rm) - 1] += r.amount;
-      });
+      const year = currentMonth.split('-')[0]; data = new Array(12).fill(0); labels = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+      expenseRecords.forEach(r => { const [ry, rm] = r.date.split('-'); if (ry === year) data[Number(rm) - 1] += r.amount; });
     } else {
-      const years = Array.from(new Set(records.map(r => r.date.split('-')[0]))).sort();
-      if (!years.length) years.push(new Date().getFullYear().toString());
-      data = years.map(y => expenseRecords.filter(r => r.date.startsWith(y)).reduce((s, r) => s + r.amount, 0));
-      labels = years;
+      const years = Array.from(new Set(records.map(r => r.date.split('-')[0]))).sort(); if (!years.length) years.push(new Date().getFullYear().toString());
+      data = years.map(y => expenseRecords.filter(r => r.date.startsWith(y)).reduce((s, r) => s + r.amount, 0)); labels = years;
     }
-
-    const W = box.clientWidth || 340;
-    const H = 200;
-    const padL = 44, padR = 12, padT = 16, padB = 28;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
-    const rawMax = Math.max(...data, 0);
-    const max = rawMax > 0 ? niceCeil(rawMax) : 1;
-
-    const points = data.map((v, i) => {
-      const x = data.length === 1 ? padL + plotW / 2 : padL + (i / (data.length - 1)) * plotW;
-      const y = padT + plotH - (v / max) * plotH;
-      return [x, y];
-    });
-
+    const W = box.clientWidth || 340; const H = 200; const padL = 44, padR = 12, padT = 16, padB = 28;
+    const plotW = W - padL - padR; const plotH = H - padT - padB; const rawMax = Math.max(...data, 0); const max = rawMax > 0 ? niceCeil(rawMax) : 1;
+    const points = data.map((v, i) => { const x = data.length === 1 ? padL + plotW / 2 : padL + (i / (data.length - 1)) * plotW; const y = padT + plotH - (v / max) * plotH; return [x, y]; });
     let svg = `<svg width="${W}" height="${H}" style="display:block;">`;
-    for (let i = 0; i <= 4; i++) {
-      const y = padT + (plotH / 4) * i;
-      const val = max - (max / 4) * i;
-      svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#f2f2f7" stroke-width="1"/>`;
-      svg += `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#c7c7cc">${val.toFixed(0)}</text>`;
-    }
-    if (points.length > 1) {
-      const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-      svg += `<path d="${path}" fill="none" stroke="#ff6b35" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-    }
-    points.forEach(p => {
-      svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#ff6b35"/>`;
-    });
+    for (let i = 0; i <= 4; i++) { const y = padT + (plotH / 4) * i; const val = max - (max / 4) * i; svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#f2f2f7" stroke-width="1"/>`; svg += `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#c7c7cc">${val.toFixed(0)}</text>`; }
+    if (points.length > 1) { const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '); svg += `<path d="${path}" fill="none" stroke="#ff6b35" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`; }
+    points.forEach(p => { svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#ff6b35"/>`; });
     const step = Math.max(1, Math.ceil(labels.length / 8));
-    labels.forEach((lb, i) => {
-      if (i % step !== 0 && i !== labels.length - 1) return;
-      const x = points[i][0];
-      svg += `<text x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#8e8e93">${lb}</text>`;
-    });
-    svg += '</svg>';
-    box.innerHTML = svg;
+    labels.forEach((lb, i) => { if (i % step !== 0 && i !== labels.length - 1) return; const x = points[i][0]; svg += `<text x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#8e8e93">${lb}</text>`; });
+    svg += '</svg>'; box.innerHTML = svg;
   }
 
-  function niceCeil(v) {
-    if (v <= 0) return 1;
-    const mag = Math.pow(10, Math.floor(Math.log10(v)));
-    const norm = v / mag;
-    let nice;
-    if (norm <= 1) nice = 1;
-    else if (norm <= 2) nice = 2;
-    else if (norm <= 5) nice = 5;
-    else nice = 10;
-    return nice * mag;
-  }
+  function niceCeil(v) { if (v <= 0) return 1; const mag = Math.pow(10, Math.floor(Math.log10(v))); const norm = v / mag; let nice; if (norm <= 1) nice = 1; else if (norm <= 2) nice = 2; else if (norm <= 5) nice = 5; else nice = 10; return nice * mag; }
 
-  // ==========================================
-  // 9. 编辑弹窗逻辑
-  // ==========================================
-  let editingId = null;
-  let editType = 'expense';
-
-  function setEditType(type) {
-    editType = type;
-    document.getElementById('editBtnExpense').classList.toggle('active', type === 'expense');
-    document.getElementById('editBtnIncome').classList.toggle('active', type === 'income');
-  }
-
+  // ========== 编辑记录 ==========
+  let editingId = null; let editType = 'expense';
+  function setEditType(type) { editType = type; document.getElementById('editBtnExpense').classList.toggle('active', type === 'expense'); document.getElementById('editBtnIncome').classList.toggle('active', type === 'income'); }
   function openEdit(id) {
-    const r = records.find(x => x.id === id);
-    if (!r) return;
-    editingId = id;
-
-    editType = r.type || 'expense';
-    setEditType(editType);
-
-    const dt = r.date + 'T' + (r.time || '00:00');
-    document.getElementById('editDatetime').value = dt;
+    const r = records.find(x => x.id === id); if (!r) return; editingId = id;
+    editType = r.type || 'expense'; setEditType(editType);
+    document.getElementById('editDatetime').value = r.date + 'T' + (r.time || '00:00');
     document.getElementById('editAmount').value = r.amount;
     document.getElementById('editNote').value = r.note || '';
-
-    const sel = document.getElementById('editCategory');
-    sel.innerHTML = categories.map(c =>
-      `<option value="${c}" ${c === r.category ? 'selected' : ''}>${escapeHtml(c)}</option>`
-    ).join('');
-
-    document.getElementById('editModal').classList.add('show');
-    setTimeout(() => document.getElementById('editAmount').focus(), 100);
+    document.getElementById('editCategory').innerHTML = categories.map(c => `<option value="${escapeHtml(c.name)}" ${c.name === r.category ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+    document.getElementById('editModal').classList.add('show'); setTimeout(() => document.getElementById('editAmount').focus(), 100);
   }
-
-  function closeEdit() {
-    editingId = null;
-    document.getElementById('editModal').classList.remove('show');
-  }
-
+  function closeEdit() { editingId = null; document.getElementById('editModal').classList.remove('show'); }
   async function saveEdit() {
-    const r = records.find(x => x.id === editingId);
-    if (!r) return;
-
-    const dt = document.getElementById('editDatetime').value;
-    if (!dt) { alert('请选择时间'); return; }
+    const r = records.find(x => x.id === editingId); if (!r) return;
+    const dt = document.getElementById('editDatetime').value; if (!dt) { alert('请选择时间'); return; }
     const [datePart, timePart] = dt.split('T');
-
-    const amount = parseFloat(document.getElementById('editAmount').value);
-    if (!amount || amount <= 0) { alert('请输入有效金额'); return; }
-
-    r.type = editType;
-    r.date = datePart;
-    r.time = timePart;
-    r.amount = amount;
-    r.category = document.getElementById('editCategory').value;
-    r.note = document.getElementById('editNote').value.trim();
-
-    await save();
-    renderAll();
-    closeEdit();
+    const amount = parseFloat(document.getElementById('editAmount').value); if (!amount || amount <= 0) { alert('请输入有效金额'); return; }
+    const updatedData = { type: editType, date: datePart, time: timePart, amount: amount, category: document.getElementById('editCategory').value, note: document.getElementById('editNote').value.trim() };
+    try { await fetchWithAuth(`${API_URL}/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) }); await load(); renderAll(); closeEdit(); }
+    catch (e) { alert('编辑保存失败，请重试'); }
   }
 
   document.getElementById('editSave').addEventListener('click', saveEdit);
   document.getElementById('editCancel').addEventListener('click', closeEdit);
-  document.getElementById('editModal').addEventListener('click', e => {
-    if (e.target.id === 'editModal') closeEdit();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && editingId) closeEdit();
-  });
+  document.getElementById('editModal').addEventListener('click', e => { if (e.target.id === 'editModal') closeEdit(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && editingId) closeEdit(); });
 
-  // ==========================================
-  // 10. 添加到桌面弹窗逻辑（支持标准浏览器，引导非标准浏览器）
-  // ==========================================
-  let deferredPrompt = null;
-  let isInstalled = false;
-
-  function checkInstalled() {
-    isInstalled =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true ||
-      document.referrer.startsWith('android-app://');
-  }
-
-  function detectBrowser() {
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('quark')) return 'quark';
-    if (ua.includes('via')) return 'via';
-    if (ua.includes('ucbrowser')) return 'uc';
-    if (ua.includes('qqbrowser')) return 'qq';
-    if (ua.includes('micromessenger')) return 'wechat';
-    if (ua.includes('edg')) return 'edge';
-    if (ua.includes('chrome')) return 'chrome';
-    if (ua.includes('safari')) return 'safari';
-    if (ua.includes('firefox')) return 'firefox';
-    return 'other';
-  }
-
-  function showDefaultBrowserTip() {
-    const titleEl = document.getElementById('installTitle');
-    const descEl = document.getElementById('installDesc');
-    const tipEl = document.getElementById('installTip');
-    const goBtn = document.getElementById('installGo');
-
-    titleEl.textContent = '推荐使用默认浏览器';
-    descEl.textContent = '当前浏览器不支持完整的桌面安装，建议用系统默认浏览器（Chrome、Edge、Safari）打开，才能获得带图标的独立桌面版。';
-    tipEl.innerHTML = '请点击下方按钮 <b>复制网址</b>，然后打开系统默认浏览器粘贴访问。';
-    tipEl.style.display = 'block';
-
-    goBtn.textContent = '复制网址';
-    goBtn.onclick = () => {
-      navigator.clipboard.writeText(window.location.href).then(() => {
-        goBtn.textContent = '已复制 ✓';
-        setTimeout(() => hideInstall(), 1500);
-      }).catch(() => {
-        alert('复制失败，请手动复制网址');
-      });
+  // ========== 导出 / 导入 ==========
+  function exportJSON() {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      username: currentUsername,
+      categories: categories.map(c => c.name),
+      records: records.map(r => ({
+        type: r.type, amount: r.amount, category: r.category,
+        note: r.note || '', date: r.date, time: r.time || ''
+      }))
     };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ledger-' + todayStr() + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
-  function showInstall() { document.getElementById('installMask').classList.add('show'); }
-  function hideInstall() { document.getElementById('installMask').classList.remove('show'); }
+  function exportCSV() { let csv = '日期,类型,分类,金额,备注\n'; const sorted = records.slice().sort((a, b) => a.date.localeCompare(b.date)); sorted.forEach(r => { const typeName = (r.type === 'income') ? '收入' : '支出'; const note = (r.note || '').replace(/"/g, '""'); csv += `${r.date},${typeName},${r.category},${r.amount},"${note}"\n`; }); const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ledger-' + todayStr() + '.csv'; a.click(); URL.revokeObjectURL(a.href); }
 
-  function markPrompted(never) {
-    localStorage.setItem('installPromptedAt', Date.now().toString());
-    if (never) localStorage.setItem('installNever', '1');
-  }
+  async function importDataFromFile(file) {
+    let data;
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch (e) {
+      alert('文件不是合法的 JSON，无法导入');
+      return;
+    }
 
-  function shouldPrompt() {
-    if (isInstalled) return false;
-    if (localStorage.getItem('installNever') === '1') return false;
-    const last = parseInt(localStorage.getItem('installPromptedAt') || '0', 10);
-    if (last && Date.now() - last < 7 * 24 * 60 * 60 * 1000) return false;
-    return true;
-  }
+    let categoriesIn = [];
+    let recordsIn = [];
 
-  function initInstallPrompt() {
-    checkInstalled();
+    if (Array.isArray(data)) {
+      recordsIn = data;
+    } else if (data && typeof data === 'object') {
+      categoriesIn = Array.isArray(data.categories) ? data.categories : [];
+      recordsIn = Array.isArray(data.records) ? data.records : [];
+    } else {
+      alert('文件格式不正确');
+      return;
+    }
 
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-    });
+    if (!categoriesIn.length && !recordsIn.length) {
+      alert('文件里没有可导入的数据');
+      return;
+    }
 
-    window.addEventListener('appinstalled', () => {
-      isInstalled = true;
-      hideInstall();
-      localStorage.setItem('installNever', '1');
-    });
+    const msg =
+      `即将导入：\n\n` +
+      `· 分类 ${categoriesIn.length} 个\n` +
+      `· 账单 ${recordsIn.length} 条\n\n` +
+      `导入是追加模式，不会覆盖现有数据。\n` +
+      `当前云端已有 ${records.length} 条账单。\n\n` +
+      `确定继续吗？`;
+    if (!confirm(msg)) return;
 
-    setTimeout(() => {
-      if (!shouldPrompt()) return;
-      const browser = detectBrowser();
-
-      if (['quark', 'via', 'uc', 'qq', 'wechat'].includes(browser)) {
-        showInstall();
-        showDefaultBrowserTip();
-      } else {
-        showInstall();
-        document.getElementById('installGo').onclick = async () => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') localStorage.setItem('installNever', '1');
-            deferredPrompt = null;
-            hideInstall();
-          } else if (browser === 'safari') {
-            document.getElementById('installDesc').textContent = '请点击底部“分享”按钮，选择“添加到主屏幕”。';
-            document.getElementById('installGo').textContent = '我知道了';
-            document.getElementById('installGo').onclick = () => hideInstall();
-          }
-        };
+    try {
+      const res = await fetchWithAuth(AUTH_URL + '/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: categoriesIn, records: recordsIn })
+      });
+      if (res.status === 401) { handleLogout(); return; }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || '导入失败');
+        return;
       }
-
-      document.getElementById('installLater').onclick = () => { markPrompted(false); hideInstall(); };
-      document.getElementById('installNever').onclick = () => { markPrompted(true); hideInstall(); };
-      document.getElementById('installMask').onclick = e => {
-        if (e.target.id === 'installMask') { markPrompted(false); hideInstall(); }
-      };
-    }, 2000);
+      const result = await res.json();
+      alert(`导入完成！\n\n新增分类 ${result.categoriesAdded} 个\n新增账单 ${result.recordsAdded} 条`);
+      await load();
+      renderAll();
+    } catch (e) {
+      alert('导入失败：' + e.message);
+    }
   }
 
-  // ==========================================
-  // 11. 启动
-  // ==========================================
-  async function init() {
+  // ========== 初始化 ==========
+  async function initMainData() {
     currentMonth = thisMonth();
     document.getElementById('date').value = todayStr();
+    await load();
+    renderAll();
+  }
+
+  function debounce(fn, ms) {
+    let t;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  function init() {
     document.getElementById('addBtn').addEventListener('click', addRecord);
     document.getElementById('amount').addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
     document.getElementById('note').addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
     document.getElementById('newCat').addEventListener('keydown', e => { if (e.key === 'Enter') addCategory(); });
-
+    document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+    document.getElementById('regPassword2').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister(); });
     document.getElementById('fileInput').addEventListener('change', e => {
       const file = e.target.files[0];
       if (file) importDataFromFile(file);
       e.target.value = '';
     });
 
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', debounce(() => {
       if (currentTab === 'stats') renderChart();
-    });
+      if (authToken) {
+        applyCollapse('cats', 'catsToggleBtn', catsExpanded);
+        applyCollapse('catManager', 'catMgrToggleBtn', catMgrExpanded);
+      }
+    }, 150));
 
-    await load();
-    renderAll();
-    initInstallPrompt();
+    checkAuth();
   }
-
   init();
-</script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
-  }
 </script>
 </body>
 </html>

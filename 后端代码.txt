@@ -1,0 +1,252 @@
+// ==========================================
+// Cloudflare Worker 多用户记账本后端
+// ==========================================
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const DEFAULT_CATEGORIES = ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '工资', '其他'];
+
+async function hashPassword(password) {
+  const msgUint8 = new TextEncoder().encode(password + "my_ledger_salt_2026");
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function authenticate(request, env) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  const user = await env.DB.prepare('SELECT id, username FROM users WHERE token = ?').bind(token).first();
+  return user;
+}
+
+async function batchInsert(db, statements, batchSize = 50) {
+  for (let i = 0; i < statements.length; i += batchSize) {
+    await db.batch(statements.slice(i, i + batchSize));
+  }
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // ---------- 注册 ----------
+    if (path === '/api/register' && method === 'POST') {
+      try {
+        const { username, password } = await request.json();
+        if (!username || !password) {
+          return Response.json({ error: '用户名和密码不能为空' }, { status: 400, headers: corsHeaders });
+        }
+        const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+        if (existing) {
+          return Response.json({ error: '该用户名已被注册' }, { status: 400, headers: corsHeaders });
+        }
+        const token = crypto.randomUUID();
+        const hashedPassword = await hashPassword(password);
+        const result = await env.DB.prepare('INSERT INTO users (username, password, token) VALUES (?, ?, ?)')
+          .bind(username, hashedPassword, token).run();
+        const userId = result.meta.last_row_id;
+        for (const name of DEFAULT_CATEGORIES) {
+          await env.DB.prepare('INSERT INTO categories (user_id, name) VALUES (?, ?)')
+            .bind(userId, name).run();
+        }
+        return Response.json({ token, username }, { status: 201, headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '注册失败：' + e.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 登录 ----------
+    if (path === '/api/login' && method === 'POST') {
+      try {
+        const { username, password } = await request.json();
+        const user = await env.DB.prepare('SELECT id, password FROM users WHERE username = ?').bind(username).first();
+        if (!user) {
+          return Response.json({ error: '用户名或密码错误' }, { status: 401, headers: corsHeaders });
+        }
+        const hashedPassword = await hashPassword(password);
+        if (user.password !== hashedPassword) {
+          return Response.json({ error: '用户名或密码错误' }, { status: 401, headers: corsHeaders });
+        }
+        const newToken = crypto.randomUUID();
+        await env.DB.prepare('UPDATE users SET token = ? WHERE id = ?').bind(newToken, user.id).run();
+        return Response.json({ token: newToken, username }, { status: 200, headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '登录失败，请重试' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 鉴权 ----------
+    const user = await authenticate(request, env);
+    if (!user) {
+      return Response.json({ error: '未登录或登录已过期' }, { status: 401, headers: corsHeaders });
+    }
+
+    // ---------- 账单：查询 ----------
+    if (path === '/api/records' && method === 'GET') {
+      try {
+        const { results } = await env.DB.prepare(
+          'SELECT * FROM records WHERE user_id = ? ORDER BY date DESC, id DESC'
+        ).bind(user.id).all();
+        return Response.json(results, { headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '数据库查询失败: ' + e.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 账单：新增 ----------
+    if (path === '/api/records' && method === 'POST') {
+      try {
+        const body = await request.json();
+        const { type, amount, category, note, date, time } = body;
+        await env.DB.prepare(
+          'INSERT INTO records (user_id, type, amount, category, note, date, time) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        ).bind(user.id, type, amount, category, note, date, time).run();
+        return new Response('Added!', { status: 201, headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '保存失败' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 账单：编辑 / 删除 ----------
+    if (path.startsWith('/api/records/')) {
+      const id = path.split('/')[3];
+      if (!id) return new Response('Not Found', { status: 404, headers: corsHeaders });
+
+      if (method === 'PUT') {
+        try {
+          const body = await request.json();
+          const { type, amount, category, note, date, time } = body;
+          const result = await env.DB.prepare(
+            'UPDATE records SET type=?, amount=?, category=?, note=?, date=?, time=? WHERE id=? AND user_id=?'
+          ).bind(type, amount, category, note, date, time, id, user.id).run();
+          if (result.meta.changes === 0) return new Response('Not Found', { status: 404, headers: corsHeaders });
+          return new Response('Updated!', { status: 200, headers: corsHeaders });
+        } catch (e) {
+          return Response.json({ error: '编辑失败' }, { status: 500, headers: corsHeaders });
+        }
+      }
+
+      if (method === 'DELETE') {
+        const result = await env.DB.prepare(
+          'DELETE FROM records WHERE id = ? AND user_id = ?'
+        ).bind(id, user.id).run();
+        if (result.meta.changes === 0) return new Response('Not Found', { status: 404, headers: corsHeaders });
+        return new Response('Deleted!', { status: 200, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 分类：列表 ----------
+    if (path === '/api/categories' && method === 'GET') {
+      try {
+        const { results } = await env.DB.prepare(
+          'SELECT id, name FROM categories WHERE user_id = ? ORDER BY id ASC'
+        ).bind(user.id).all();
+        return Response.json(results, { headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '查询分类失败' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 分类：新增 ----------
+    if (path === '/api/categories' && method === 'POST') {
+      try {
+        const { name } = await request.json();
+        if (!name) return Response.json({ error: '分类名不能为空' }, { status: 400, headers: corsHeaders });
+        const dup = await env.DB.prepare('SELECT id FROM categories WHERE user_id = ? AND name = ?')
+          .bind(user.id, name).first();
+        if (dup) return Response.json({ error: '该分类已存在' }, { status: 400, headers: corsHeaders });
+        const result = await env.DB.prepare('INSERT INTO categories (user_id, name) VALUES (?, ?)')
+          .bind(user.id, name).run();
+        return Response.json({ id: result.meta.last_row_id, name }, { status: 201, headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '添加失败' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 分类：删除 ----------
+    if (path.startsWith('/api/categories/') && method === 'DELETE') {
+      try {
+        const id = path.split('/')[3];
+        if (!id) return new Response('Not Found', { status: 404, headers: corsHeaders });
+        const cat = await env.DB.prepare('SELECT id, name FROM categories WHERE id = ? AND user_id = ?')
+          .bind(id, user.id).first();
+        if (!cat) return new Response('Not Found', { status: 404, headers: corsHeaders });
+        const countRow = await env.DB.prepare('SELECT COUNT(*) as c FROM categories WHERE user_id = ?')
+          .bind(user.id).first();
+        if (countRow.c <= 1) {
+          return Response.json({ error: '至少保留一个分类' }, { status: 400, headers: corsHeaders });
+        }
+        if (cat.name !== '其他') {
+          await env.DB.prepare('UPDATE records SET category = ? WHERE user_id = ? AND category = ?')
+            .bind('其他', user.id, cat.name).run();
+        }
+        await env.DB.prepare('DELETE FROM categories WHERE id = ? AND user_id = ?')
+          .bind(id, user.id).run();
+        return new Response('Deleted!', { status: 200, headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '删除失败' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // ---------- 批量导入 ----------
+    if (path === '/api/import' && method === 'POST') {
+      try {
+        const body = await request.json();
+        const categoriesIn = Array.isArray(body.categories) ? body.categories : [];
+        const recordsIn = Array.isArray(body.records) ? body.records : [];
+        let categoriesAdded = 0;
+        let recordsAdded = 0;
+
+        if (categoriesIn.length) {
+          const existing = await env.DB.prepare('SELECT name FROM categories WHERE user_id = ?')
+            .bind(user.id).all();
+          const existingNames = new Set(existing.results.map(c => c.name));
+          const catStmts = [];
+          for (const c of categoriesIn) {
+            const name = typeof c === 'string' ? c : (c && c.name);
+            if (!name) continue;
+            const trimmed = String(name).trim();
+            if (!trimmed || existingNames.has(trimmed)) continue;
+            catStmts.push(env.DB.prepare('INSERT INTO categories (user_id, name) VALUES (?, ?)')
+              .bind(user.id, trimmed));
+            existingNames.add(trimmed);
+            categoriesAdded++;
+          }
+          if (catStmts.length) await batchInsert(env.DB, catStmts);
+        }
+
+        if (recordsIn.length) {
+          const recStmts = [];
+          for (const r of recordsIn) {
+            if (!r || !r.type || !r.date) continue;
+            const amt = parseFloat(r.amount);
+            if (!isFinite(amt)) continue;
+            recStmts.push(env.DB.prepare(
+              'INSERT INTO records (user_id, type, amount, category, note, date, time) VALUES (?, ?, ?, ?, ?, ?, ?)'
+            ).bind(user.id, r.type === 'income' ? 'income' : 'expense', amt,
+              r.category || '其他', r.note || '', r.date, r.time || ''));
+            recordsAdded++;
+          }
+          if (recStmts.length) await batchInsert(env.DB, recStmts);
+        }
+        return Response.json({ categoriesAdded, recordsAdded }, { headers: corsHeaders });
+      } catch (e) {
+        return Response.json({ error: '导入失败：' + e.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    return new Response('Not Found', { status: 404, headers: corsHeaders });
+  }
+};
